@@ -128,7 +128,7 @@ def parse_flru_projects():
                 # Ищем ключевые слова (amoCRM, и др.)
                 if (
                     link not in seen_links and 
-                    re.search(r'amocrm|amo crm|amo-crm|amo|амо|амосрм|амо срм|амоцрм|амо црм', description, re.IGNORECASE)
+                    re.search(r'amocrm|amo[ -]?crm|амо[ -]?црм', description, re.IGNORECASE)
                 ):
                     log(f"🎉 НАЙДЕН! Страница {page_num}, проект {i}: '{title[:50]}...' → {link}")
                     page_projects.append({
