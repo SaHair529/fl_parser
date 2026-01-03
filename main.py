@@ -6,14 +6,17 @@ from datetime import datetime
 import json
 import os
 
+
 CHECK_FILE = 'flru_last_projects.json'
 log_time = lambda: datetime.now().strftime('%H:%M:%S')
 
 TELEGRAM_TOKEN = "8377039422:AAGyRkbIFZrrelhKIC8_hRMRSGOlvEIQK7Y"
 TELEGRAM_CHAT_ID = 440532768
 
+
 def log(message):
     print(f"[{log_time()}] {message}")
+
 
 def send_telegram(message: str):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
@@ -32,6 +35,7 @@ def send_telegram(message: str):
     except Exception as e:
         log(f"❌ Ошибка запроса к Telegram: {e}")
 
+
 def load_last_projects():
     log("📂 Загрузка списка проверенных проектов...")
     if os.path.exists(CHECK_FILE):
@@ -46,6 +50,7 @@ def load_last_projects():
     log("📂 Файл ссылок не найден, начинаем с чистого листа")
     return set()
 
+
 def save_projects(projects):
     try:
         with open(CHECK_FILE, 'w', encoding='utf-8') as f:
@@ -53,6 +58,7 @@ def save_projects(projects):
         log(f"💾 Сохранено {len(projects)} ссылок в {CHECK_FILE}")
     except Exception as e:
         log(f"❌ Ошибка сохранения: {e}")
+
 
 def parse_flru_projects():
     log("🌐 Запрос ко ВСЕМ страницам https://www.fl.ru/projects/?kind=1")
@@ -113,10 +119,10 @@ def parse_flru_projects():
                 description = description_full.lower()
                 link = 'https://www.fl.ru' + link_elem.get('href')
                 
-                # Логирование
-                if page_num == 1 and i <= 15:
+                # Логирование (немного ограниченное, чтобы логи cron не пухли)
+                if page_num == 1 and i <= 10:
                     log(f"🔍 [1-{i}/{len(posts)}] '{title[:50]}...'")
-                elif total_checked % 20 == 0:
+                elif total_checked % 30 == 0:
                     log(f"🔍 [{total_checked} всего] '{title[:50]}...'")
                 
                 # Ищем ключевые слова (amoCRM, Bitrix24, 1C и др.)
@@ -153,53 +159,41 @@ def parse_flru_projects():
     save_projects(seen_links)
     return all_projects
 
-print("🚀 Запуск парсера FL.ru (ВСЕ страницы, Ctrl+C для остановки)")
-log("Старт основного цикла мониторинга")
 
-while True:
-    try:
-        log("🔄 Новая итерация проверки...")
-        start_time = datetime.now()
+def main():
+    print("🚀 Запуск парсера FL.ru (разовый запуск)")
+    start_time = datetime.now()
+    
+    new_projects = parse_flru_projects()
+    
+    if new_projects:
+        # Собираем одно или несколько сообщений, чтобы не спамить
+        chunks = []
+        for p in new_projects:
+            part = (
+                f"📋 <b>{p['title']}</b>\n"
+                f"🔗 <a href=\"{p['link']}\">Ссылка</a> (стр. {p['page']})\n"
+                f"💬 {p['description']}\n"
+                f"⏰ {p['time']}\n"
+                "───────────────\n"
+            )
+            chunks.append(part)
         
-        new_projects = parse_flru_projects()
-        
-        if new_projects:
-            # Собираем одно сообщение, чтобы не спамить
-            chunks = []
-            for p in new_projects:
-                part = (
-                    f"📋 <b>{p['title']}</b>\n"
-                    f"🔗 <a href=\"{p['link']}\">Ссылка</a> (стр. {p['page']})\n"
-                    f"💬 {p['description']}\n"
-                    f"⏰ {p['time']}\n"
-                    "───────────────\n"
-                )
-                chunks.append(part)
-            
-            # Если вдруг много — порежем по длине (Telegram лимит ~4096 символов)
-            current = ""
-            for part in chunks:
-                if len(current) + len(part) > 3800:
-                    send_telegram(current)
-                    current = ""
-                    time.sleep(1)
-                current += part
-            if current:
+        current = ""
+        for part in chunks:
+            if len(current) + len(part) > 3800:  # запас до лимита 4096
                 send_telegram(current)
-            
-            log(f"✅ Найдено {len(new_projects)} новых проектов и отправлено в Telegram")
-        else:
-            elapsed = (datetime.now() - start_time).total_seconds()
-            log(f"✅ Новых заказов нет (итерация: {elapsed:.1f}с)")
+                current = ""
+                time.sleep(1)
+            current += part
+        if current:
+            send_telegram(current)
         
-        log("😴 Спим 120 секунд до следующей проверки...")
-        time.sleep(120)
-        
-    except KeyboardInterrupt:
-        log("👋 Получен сигнал остановки")
-        print("\n👋 Парсер остановлен пользователем")
-        break
-    except Exception as e:
-        log(f"💥 Критическая ошибка цикла: {e}")
-        log("⏳ Спим 30 секунд перед повтором")
-        time.sleep(30)
+        log(f"✅ Найдено {len(new_projects)} новых проектов и отправлено в Telegram")
+    else:
+        elapsed = (datetime.now() - start_time).total_seconds()
+        log(f"✅ Новых заказов нет (запуск занял {elapsed:.1f}с)")
+
+
+if __name__ == "__main__":
+    main()
