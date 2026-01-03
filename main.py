@@ -125,10 +125,10 @@ def parse_flru_projects():
                 elif total_checked % 30 == 0:
                     log(f"🔍 [{total_checked} всего] '{title[:50]}...'")
                 
-                # Ищем ключевые слова (amoCRM, Bitrix24, 1C и др.)
+                # Ищем ключевые слова (amoCRM, и др.)
                 if (
                     link not in seen_links and 
-                    re.search(r'amocrm|amo crm|amo-crm|bitrix24?|1c|amo|битрикс', description, re.IGNORECASE)
+                    re.search(r'amocrm|amo crm|amo-crm|amo|амо|амосрм|амо срм|амоцрм|амо црм', description, re.IGNORECASE)
                 ):
                     log(f"🎉 НАЙДЕН! Страница {page_num}, проект {i}: '{title[:50]}...' → {link}")
                     page_projects.append({
